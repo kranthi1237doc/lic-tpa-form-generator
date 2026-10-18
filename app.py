@@ -1,3 +1,4 @@
+from datetime import datetime
 from io import BytesIO
 import pypdf
 from reportlab.lib.pagesizes import letter
@@ -5,107 +6,148 @@ from reportlab.pdfgen import canvas
 import streamlit as st
 
 st.set_page_config(
-    page_title="LIC Form PDF Stamping Portal", page_icon="🖨️", layout="wide"
+    page_title="LIC Official PDF Stamping Portal", page_icon="🖨️", layout="wide"
 )
 
-st.title("🩺 LIC & Health India TPA - Official PDF Form Stamping App")
+st.title("🩺 LIC & Health India TPA - Official Form Stamping Tool")
 st.markdown(
-    "Upload your blank LIC PDF form below, fill in the patient details, and this"
-    " app will stamp your text directly onto the document."
+    "This tool takes your **official blank LIC PDF form**, places your typed"
+    " patient data directly onto the blank spaces, and outputs the completed"
+    " official document."
 )
 
-# File uploader for the blank template PDF
+# 1. File Uploader for the official blank form
 uploaded_file = st.file_uploader(
-    "Upload Blank LIC PDF Form (e.g., NEW FORMS LIC (2).pdf)", type=["pdf"]
+    "Upload Official Blank LIC PDF Form (e.g., Lic forms-1.pdf)", type=["pdf"]
 )
 
 if uploaded_file is not None:
-  st.success("Blank PDF uploaded successfully! Fill in the details below.")
+  st.success(
+      "Official form template loaded! Fill in the details below to stamp them"
+      " onto the document."
+  )
 
-  with st.form("overlay_form"):
+  with st.form("stamping_form"):
     st.subheader("1. Patient & Policy Details")
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
-      proposal_no = st.text_input("Proposal / Policy Number")
-      la_name = st.text_input("Full Name of Life Assured")
-      age_gender = st.text_input("Age / Gender", value="35 / Male")
+      proposal_no = st.text_input("Proposal No", value="")
     with col2:
-      mobile = st.text_input("Mobile Number")
-      id_proof = st.text_input("ID Proof & No (Last 4 digits)")
-
-    st.subheader("2. Physical Vitals")
-    col3, col4, col5, col6 = st.columns(4)
+      la_name = st.text_input("Name of Life Assured / Proposer", value="")
     with col3:
-      height = st.text_input("Height (cm)", value="170")
+      exam_date = st.text_input(
+          "Date", value=datetime.today().strftime("%d/%m/%Y")
+      )
+
+    st.subheader("2. Identity Proof Verification")
+    col4, col5 = st.columns(2)
     with col4:
-      weight = st.text_input("Weight (kg)", value="70")
+      id_type = st.selectbox(
+          "Select Verified Photo ID Type",
+          [
+              "Aadhaar Card",
+              "PAN Card",
+              "Driving License",
+              "Ration Card",
+              "Passport",
+              "Employment Identity Card",
+          ],
+      )
     with col5:
-      pulse = st.text_input("Pulse (bpm)", value="72")
+      id_details = st.text_input(
+          "ID Number / Details (e.g. Last 4 digits)", value=""
+      )
+
+    st.subheader("3. Clinical Vitals & Mobile")
+    col6, col7, col8 = st.columns(3)
     with col6:
-      bp = st.text_input("Blood Pressure", value="120/80")
+      mobile_no = st.text_input("Mobile Number", value="")
+    with col7:
+      height_weight = st.text_input("Height & Weight", value="170 cm / 70 kg")
+    with col8:
+      bp_pulse = st.text_input("BP & Pulse", value="120/80 mmHg | 72 bpm")
 
-    st.subheader(
-        "3. Text Position Adjustment (Coordinates from bottom-left corner)"
-    )
-    st.markdown(
-        "You can adjust where the text starts printing on Page 1 if needed."
-    )
-    c_x, c_y = st.columns(2)
-    with c_x:
-      x_pos = st.number_input(
-          "X Position (Left margin in points)", value=120.0
+    st.markdown("---")
+    with st.expander(
+        "⚙️ Fine-Tune Print Coordinates (Adjust if text alignment needs"
+        " shifting)"
+    ):
+      st.markdown(
+          "Use these controls to move where the text prints on the page."
       )
-    with c_y:
-      y_pos = st.number_input(
-          "Y Position (Bottom margin in points)", value=640.0
-      )
+      c_x, c_y = st.columns(2)
+      with c_x:
+        start_x = st.number_input(
+            "Horizontal Position (X Offset)",
+            value=160.0,
+            help="Higher moves text right",
+        )
+      with c_y:
+        start_y = st.number_input(
+            "Vertical Position (Y Offset from top)",
+            value=740.0,
+            help="Lower moves text down",
+        )
 
-    submitted = st.form_submit_button("Generate Stamped PDF")
+    submitted = st.form_submit_button("Stamp & Generate Official PDF")
 
   if submitted:
     if not proposal_no or not la_name:
-      st.error("Please fill in at least the Proposal Number and Name.")
+      st.error(
+          "Please enter at least the Proposal Number and Life Assured Name."
+      )
     else:
       # Create transparent overlay sheet using ReportLab
       packet = BytesIO()
+      # Standard Letter page size in points: 612 x 792
       can = canvas.Canvas(packet, pagesize=letter)
-      can.setFont("Helvetica", 10)
+      can.setFont("Helvetica-Bold", 10)
 
-      # Draw text fields line by line downwards from the Y position
-      current_y = y_pos
-      line_spacing = 16
+      # Stamping data onto precise coordinate slots
+      y = start_y
 
-      can.drawString(x_pos, current_y, f"{proposal_no}")
-      current_y -= line_spacing * 2.5
-      can.drawString(x_pos, current_y, f"{la_name}")
-      current_y -= line_spacing * 1.5
-      can.drawString(x_pos, current_y, f"{age_gender}")
-      current_y -= line_spacing * 1.5
+      # Proposal No & Date row
+      can.drawString(start_x, y, f"{proposal_no}")
+      can.drawString(start_x + 240, y, f"{exam_date}")
+
+      # Name row
+      y -= 22
+      can.drawString(start_x, y, f"{la_name}")
+
+      # Identity proof section mapping based on selected type
+      id_offsets = {
+          "Aadhaar Card": 105,
+          "PAN Card": 122,
+          "Driving License": 138,
+          "Ration Card": 155,
+          "Passport": 172,
+          "Employment Identity Card": 190,
+      }
+      target_id_drop_y = start_y - id_offsets.get(id_type, 122)
+      can.drawString(start_x + 100, target_id_drop_y, f": {id_details}")
+
+      # Mobile and Vitals lower down the page
       can.drawString(
-          x_pos, current_y, f"Mobile: {mobile} | ID: {id_proof}"
-      )
-      current_y -= line_spacing * 1.5
-      can.drawString(
-          x_pos,
-          current_y,
-          f"Ht: {height}cm | Wt: {weight}kg | Pulse: {pulse} | BP: {bp}",
+          start_x,
+          start_y - 250,
+          f"Mobile: {mobile_no} | {height_weight} | {bp_pulse}",
       )
 
       can.save()
       packet.seek(0)
 
-      # Load original PDF and overlay packet
+      # Load original template PDF and overlay packet
       original_pdf = pypdf.PdfReader(uploaded_file)
       overlay_pdf = pypdf.PdfReader(packet)
 
       output_pdf = pypdf.PdfWriter()
 
-      # Merge overlay onto the first page of the original PDF
+      # Merge the overlay transparent sheet onto Page 1 of the official form
       page = original_pdf.pages[0]
       page.merge_page(overlay_pdf.pages[0])
       output_pdf.add_page(page)
 
-      # Append any remaining pages unmodified
+      # Copy any remaining pages (like page 2) untouched from the original form
       for i in range(1, len(original_pdf.pages)):
         output_pdf.add_page(original_pdf.pages[i])
 
@@ -114,17 +156,17 @@ if uploaded_file is not None:
       output_buffer.seek(0)
 
       st.success(
-          "Official PDF successfully stamped! Download your completed form"
-          " below."
+          "Official form stamped successfully! The background template remains"
+          " completely intact."
       )
       st.download_button(
-          label="📥 Download Stamped LIC PDF",
+          label="📥 Download Stamped Official PDF",
           data=output_buffer,
-          file_name=f"Stamped_LIC_{proposal_no}.pdf",
+          file_name=f"Official_Stamped_LIC_{proposal_no}.pdf",
           mime="application/pdf",
       )
 else:
   st.info(
-      "👆 Please upload your blank LIC PDF form using the file uploader above"
-      " to get started."
+      "👆 Please upload your blank official LIC form PDF using the file"
+      " uploader above to begin."
   )
